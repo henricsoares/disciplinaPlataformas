@@ -2,31 +2,42 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-#include <HCSR04.h>
 
 #define DEBUG_UART_BAUDRATE   115200   
 
 #define MQTT_PUB_TOPIC "tago/data/post"
 #define MQTT_USERNAME  "esp01a"
 #define MQTT_PASSWORD  "af1876a8-6ab5-49d5-86eb-5f0e4774614e"
-UltraSonicDistanceSensor distanceSensor(0, 2); 
+const int PinEcho = 2; //PINO DIGITAL UTILIZADO PELO HC-SR04 ECHO(RECEBE)
+const int PinTrigger = 0; //PINO DIGITAL UTILIZADO PELO HC-SR04 TRIG(ENVIA)
 unsigned long TEMPO_ENVIO_INFORMACOES = millis();
+/* WIFI */
+const char* ssid_wifi = "hsmm";         /*  WI-FI network SSID (name) you want to connect */
+const char* password_wifi = "Hsmm0106"; /*  WI-FI network password */
+WiFiClient espClient;    
 
 /* MQTT */
 const char* broker_mqtt = "mqtt.tago.io"; /* MQTT broker URL */
 int broker_port = 1883;                   /* MQTT broker port */
 PubSubClient MQTT(espClient);
 
-/* WIFI */
-const char* ssid_wifi = "hsmm";         /*  WI-FI network SSID (name) you want to connect */
-const char* password_wifi = "Hsmm0106"; /*  WI-FI network password */
-WiFiClient espClient;     
- 
-
 void connect_MQTT(void);
 void connect_wifi(void);
 void send_data_iot_platform(void);
 
+float TempoEcho = 0;
+const float VelocidadeSom_mpors = 340;
+const float VelocidadeSom_mporus = 0.000340; 
+
+void DisparaPulsoUltrassonico(){
+  digitalWrite(PinTrigger, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(PinTrigger, LOW);
+  }
+
+float CalculaDistancia(float tempo_us){
+  return(100*(tempo_us*VelocidadeSom_mporus)/2);
+}
 void connect_wifi(void){
   Serial.println("------WI-FI -----");
   Serial.print("Tentando se conectar a rede wi-fi ");
@@ -49,7 +60,6 @@ void connect_wifi(void){
 
 void connect_MQTT(void){
   MQTT.setServer(broker_mqtt, broker_port);
-  MQTT.setCallback(callback);
   char mqtt_id_randomico[5] = {0};
   while (!MQTT.connected()){
     Serial.print("* Tentando se conectar ao broker MQTT: ");
@@ -80,7 +90,9 @@ JSON a ser enviado para Tago.io:
 void send_data_iot_platform(void){
   StaticJsonDocument<250> tago_json_distance;
   char json_string[250] = {0};
-  float distance = distanceSensor.measureDistanceCm();
+  DisparaPulsoUltrassonico();
+  TempoEcho = pulseIn(PinEcho, HIGH);
+  float distance = CalculaDistancia(TempoEcho);
   int i;
   for (i=0; i<5; i++)
     Serial.println(" ");
@@ -88,9 +100,9 @@ void send_data_iot_platform(void){
   Serial.print("Distance: ");
   Serial.println(distance);
   /* Envio do volume */
-  tago_json_volume["variable"] = "distance";
-  tago_json_volume["unit"] = "cm";
-  tago_json_volume["value"] = distance;
+  tago_json_distance["variable"] = "distance";
+  tago_json_distance["unit"] = "cm";
+  tago_json_distance["value"] = distance;
   memset(json_string, 0, sizeof(json_string));
   serializeJson(tago_json_distance, json_string);
   MQTT.publish(MQTT_PUB_TOPIC, json_string);
@@ -100,6 +112,9 @@ void setup(){
   Serial.begin(DEBUG_UART_BAUDRATE);
   connect_wifi();
   connect_MQTT();
+  pinMode(PinTrigger, OUTPUT);
+  digitalWrite(PinTrigger, LOW);
+  pinMode(PinEcho, INPUT);
   }
 
 void loop() {

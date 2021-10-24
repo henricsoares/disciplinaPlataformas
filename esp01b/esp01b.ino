@@ -7,33 +7,35 @@
 
 #define MQTT_PUB_TOPIC "tago/data/post"
 #define MQTT_USERNAME  "esp01b"
-#define MQTT_PASSWORD  ""
+#define MQTT_PASSWORD  "2d11f1c7-1ea3-4b10-96e9-89f1946661e6"
 unsigned long TEMPO_ENVIO_INFORMACOES = millis();
 bool waterSupply = false;
+
+/* WIFI */
+const char* ssid_wifi = "hsmm";         /*  WI-FI network SSID (name) you want to connect */
+const char* password_wifi = "Hsmm0106"; /*  WI-FI network password */
+WiFiClient espClient;    
+
 
 /* MQTT */
 const char* broker_mqtt = "mqtt.tago.io"; /* MQTT broker URL */
 int broker_port = 1883;                   /* MQTT broker port */
 PubSubClient MQTT(espClient);
 
-/* WIFI */
-const char* ssid_wifi = "hsmm";         /*  WI-FI network SSID (name) you want to connect */
-const char* password_wifi = "********"; /*  WI-FI network password */
-WiFiClient espClient;     
- 
+
 
 void connect_MQTT(void);
 void connect_wifi(void);
 void send_data_iot_platform(void);
 void pumpWater(void);
 
-void connect_wifi(void){
+void connect_wifi(void){ 
+  if (WiFi.status() == WL_CONNECTED)
+    return;
   Serial.println("------WI-FI -----");
   Serial.print("Tentando se conectar a rede wi-fi ");
   Serial.println(ssid_wifi);
-  Serial.println("Aguardando conexao");  
-  if (WiFi.status() == WL_CONNECTED)
-    return;
+  Serial.println("Aguardando conexao"); 
   WiFi.begin(ssid_wifi, password_wifi);
   while (WiFi.status() != WL_CONNECTED){
     delay(100);
@@ -82,9 +84,9 @@ void send_data_iot_platform(void){
   StaticJsonDocument<250> tago_json_bomba;
   char json_string[250] = {0};
   /* Envio do estado */
-  tago_json_volume["variable"] = "bomba";
-  tago_json_volume["unit"] = "";
-  tago_json_volume["value"] = waterSupply;
+  tago_json_bomba["variable"] = "bomba";
+  tago_json_bomba["unit"] = "";
+  tago_json_bomba["value"] = waterSupply;
   memset(json_string, 0, sizeof(json_string));
   serializeJson(tago_json_bomba, json_string);
   MQTT.publish(MQTT_PUB_TOPIC, json_string);
@@ -92,11 +94,12 @@ void send_data_iot_platform(void){
 
 void callback(char* topic, byte* payload, unsigned int length){
   char resposta = (char)payload[0];
-  if(resposta >> 0)
-    waterSupply = true;        
+  if(resposta == '1'){
+    waterSupply = true;            
     }
-  else
+  else if(resposta == '0'){
     waterSupply = false;
+    }  
   pumpWater();
   if((millis() - TEMPO_ENVIO_INFORMACOES) > 1000){
     send_data_iot_platform();
@@ -107,9 +110,9 @@ void callback(char* topic, byte* payload, unsigned int length){
 
 void pumpWater(void){
   if(waterSupply)
-    digitalWrite(0, HIGH);
-  else
     digitalWrite(0, LOW);
+  else
+    digitalWrite(0, HIGH);
   }
 
 void setup(){
