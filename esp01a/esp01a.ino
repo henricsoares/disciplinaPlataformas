@@ -93,6 +93,10 @@ void send_data_iot_platform(void){
   DisparaPulsoUltrassonico();
   TempoEcho = pulseIn(PinEcho, HIGH);
   float distance = CalculaDistancia(TempoEcho);
+  if(distance <= 11.56)
+    distance = 11.56;
+  else if(distance >= 21.19)
+    distance = 21.19;
   int i;
   for (i=0; i<5; i++)
     Serial.println(" ");
